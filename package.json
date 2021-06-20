@@ -1,6 +1,6 @@
 {
     "name": "minyami",
-    "version": "3.1.9",
+    "version": "4.2.2",
     "description": "",
     "main": "dist/exports.js",
     "types": "dist/exports.d.ts",
@@ -17,6 +17,9 @@
     "files": [
         "/dist/"
     ],
+    "engines": {
+        "node": "~12 || ~14 || ~15 || ~16"
+    },
     "author": {
         "email": "sora@sound.moe",
         "name": "Eridanus Sora"
@@ -24,15 +27,18 @@
     "license": "GPL-3.0-or-later",
     "dependencies": {
         "@eridanussora/reconnecting-websocket": "^4.4.2",
-        "axios": "^0.18.1",
-        "chalk": "^2.4.1",
-        "cli-progress": "^3.6.0",
-        "crypto-js": "^3.1.9-1",
-        "erii": "^2.0.0",
+        "agent-base": "^6.0.2",
+        "axios": "^0.21.1",
+        "chalk": "^2.4.2",
+        "cli-progress": "^3.8.2",
+        "crypto-js": "^3.3.0",
+        "erii": "^2.0.3",
+        "https-proxy-agent": "^5.0.0",
         "socks-proxy-agent": "^5.0.0",
-        "ws": "^6.1.2"
+        "ws": "^7.4.6"
     },
     "devDependencies": {
-        "@types/node": "^13.13.15"
+        "@types/node": "^13.13.45",
+        "typescript": "^4.1.3"
     }
 }

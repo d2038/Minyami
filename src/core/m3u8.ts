@@ -1,4 +1,4 @@
-import { URL } from "url";
+import CommonUtils from "../utils/common";
 
 /**
  * M3U8 Parser
@@ -34,9 +34,7 @@ export default class M3U8 {
      * 解析基本属性
      */
     parse() {
-        this.isEncrypted =
-            this.m3u8Content.match(/EXT-X-KEY:METHOD=AES-128,URI="(.+)"/) !==
-            null;
+        this.isEncrypted = this.m3u8Content.match(/EXT-X-KEY:METHOD=AES-128,URI="(.+)"/) !== null;
         this.isEnd = this.m3u8Content.match(/EXT-X-ENDLIST/) !== null;
 
         let inHeaderPart = true;
@@ -57,31 +55,34 @@ export default class M3U8 {
                     } else {
                         if (inHeaderPart) {
                             this.isEncrypted = true;
-                            this.key = line.match(
-                                /EXT-X-KEY:METHOD=AES-128,URI="(.+)"/
-                            )[1];
-                            this.iv =
-                                line.match(/IV=0x(.+)/) &&
-                                line.match(/IV=0x(.+)/)[1];
+                            this.key = line.match(/EXT-X-KEY:METHOD=AES-128,URI="(.+)"/)[1];
+                            this.iv = line.match(/IV=0x(.+)/) && line.match(/IV=0x(.+)/)[1];
                         } else {
-                            key = line.match(
-                                /EXT-X-KEY:METHOD=AES-128,URI="(.+)"/
-                            )[1];
-                            iv =
-                                line.match(/IV=0x(.+)/) &&
-                                line.match(/IV=0x(.+)/)[1];
+                            key = line.match(/EXT-X-KEY:METHOD=AES-128,URI="(.+)"/)[1];
+                            iv = line.match(/IV=0x(.+)/) && line.match(/IV=0x(.+)/)[1];
                         }
                     }
                 }
                 if (line.startsWith("#EXT-X-MEDIA-SEQUENCE")) {
                     if (inHeaderPart) {
-                        this.sequenceId = line.match(
-                            /#EXT-X-MEDIA-SEQUENCE:(\d+)/
-                        )[1];
+                        this.sequenceId = line.match(/#EXT-X-MEDIA-SEQUENCE:(\d+)/)[1];
                     } else {
-                        sequenceId = line.match(
-                            /#EXT-X-MEDIA-SEQUENCE:(\d+)/
-                        )[1];
+                        sequenceId = line.match(/#EXT-X-MEDIA-SEQUENCE:(\d+)/)[1];
+                    }
+                }
+                if (line.startsWith("#EXT-X-MAP:URI=")) {
+                    // Initial segment
+                    const initialSegmentUrl = line.match(/URI="(.+)"/)[1];
+                    if (initialSegmentUrl.startsWith("http")) {
+                        this.chunks.push({
+                            url: initialSegmentUrl,
+                        });
+                    } else if (this.m3u8Url) {
+                        this.chunks.push({
+                            url: CommonUtils.buildFullUrl(this.m3u8Url, initialSegmentUrl),
+                        });
+                    } else {
+                        throw new M3U8ParseError("Missing full url for m3u8.");
                     }
                 }
             } else {
@@ -93,34 +94,13 @@ export default class M3U8 {
                 const newChunk: M3U8Chunk = {
                     url: "",
                 };
+
                 if (line.startsWith("http")) {
                     newChunk.url = line;
-                } else if (line.startsWith("//")) {
-                    if (this.m3u8Url) {
-                        newChunk.url = new URL(this.m3u8Url).protocol + line;
-                    } else {
-                        throw new M3U8ParseError("Missing full url for m3u8.");
-                    }
-                } else if (line.startsWith("/")) {
-                    if (this.m3u8Url) {
-                        newChunk.url =
-                            this.m3u8Url.match(/(htt(p|ps):\/\/.+?\/)/)[1] +
-                            line.slice(1);
-                    } else {
-                        throw new M3U8ParseError("Missing full url for m3u8.");
-                    }
+                } else if (this.m3u8Url) {
+                    newChunk.url = CommonUtils.buildFullUrl(this.m3u8Url, line);
                 } else {
-                    if (this.m3u8Url) {
-                        const pathWithoutParams =
-                            new URL(this.m3u8Url).origin +
-                            new URL(this.m3u8Url).pathname;
-                        newChunk.url = `${pathWithoutParams
-                            .split("/")
-                            .slice(0, -1)
-                            .join("/")}/${line}`;
-                    } else {
-                        throw new M3U8ParseError("Missing full url for m3u8.");
-                    }
+                    throw new M3U8ParseError("Missing full url for m3u8.");
                 }
                 if (key) {
                     newChunk.key = key;
@@ -140,27 +120,20 @@ export default class M3U8 {
      * 获得加密Key
      */
     getKey() {
-        return (
-            this.isEncrypted &&
-            this.m3u8Content.match(/EXT-X-KEY:METHOD=AES-128,URI="(.+)"/)[1]
-        );
+        return this.isEncrypted && this.m3u8Content.match(/EXT-X-KEY:METHOD=AES-128,URI="(.+)"/)[1];
     }
 
     /**
      * 获得加密IV
      */
     getIV() {
-        return (
-            this.isEncrypted &&
-            this.m3u8Content.match(/IV=0x(.+)/) &&
-            this.m3u8Content.match(/IV=0x(.+)/)[1]
-        );
+        return this.isEncrypted && this.m3u8Content.match(/IV=0x(.+)/)?.[1];
     }
 
     /**
      * 获得块长度
      */
     getChunkLength() {
-        return parseFloat(this.m3u8Content.match(/#EXTINF:(.+?)(,|$)/m)[1]);
+        return parseFloat(this.m3u8Content.match(/#EXTINF:(.+?)(,|$)/m)?.[1] ?? "5.000");
     }
 }

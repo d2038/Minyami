@@ -3,13 +3,13 @@
 ## 依赖
 * mkvmerge (可选，mkv 格式输出需要)
 
+! Minyami 要求使用处于 活跃/维护LTS 或 当前版 状态的 最新版 Node.js。推荐选用 活跃LTS。详见[这里](https://nodejs.org/zh-cn/about/releases/)。
+
 需安装并确保系统变量`PATH`中添加可执行程序所在的路径。
 
 ## 安装
 
-```
-npm install minyami -g
-```
+`npm -g i minyami` 或 `yarn global add minyami`
 
 此外，请安装插件配合 Minyami 使用。
 
@@ -41,8 +41,8 @@ Help:
          --live                    直播下载模式
          --format <format_name>    (可选) 输出格式，默认为 ts
              <format_name>         格式名称，ts 或 mkv
-         --proxy <socks-proxy>     通过 Socks 代理下载
-             <socks-proxy>         代理地址，格式为 [<host>:<port>] 例如 --proxy "127.0.0.1:1080"
+         --proxy <proxy-server>    为 Minyami 设置代理
+             <proxy-server>        代理地址，格式为 [protocol://<host>:<port>] 例如 --proxy "http://127.0.0.1:1080"
          --slice <range>           下载部分内容
              <range>               设置时间范围，格式为 [<hh:mm:ss>-<hh:mm:ss> format] 例如 --slice "45:00-53:00"
          --nomerge                 不合并视频分块。

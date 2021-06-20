@@ -1,11 +1,10 @@
-import { exec } from "./system";
-import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
-import { AxiosProxyConfig } from "axios";
 import * as fs from "fs";
-import UA from "./ua";
 import { URL } from "url";
 import * as crypto from "crypto";
-const SocksProxyAgent = require("socks-proxy-agent");
+import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
+import { exec } from "./system";
+import ProxyAgentHelper from "../utils/agent";
+import UA from "../constants/ua";
 
 /**
  * 合并视频文件
@@ -13,7 +12,7 @@ const SocksProxyAgent = require("socks-proxy-agent");
  * @param output 输出路径
  */
 export function mergeToMKV(fileList = [], output = "./output.mkv") {
-    return new Promise(async (resolve) => {
+    return new Promise<void>(async (resolve) => {
         if (fileList.length === 0) {
             return;
         }
@@ -24,10 +23,7 @@ export function mergeToMKV(fileList = [], output = "./output.mkv") {
         const parameters = fileList.concat(["-o", output, "-q"]);
 
         const tempFilename = `temp_${new Date().valueOf()}.json`;
-        fs.writeFileSync(
-            `./${tempFilename}`,
-            JSON.stringify(parameters, null, 2)
-        );
+        fs.writeFileSync(`./${tempFilename}`, JSON.stringify(parameters, null, 2));
         await exec(`mkvmerge @${tempFilename}`);
         fs.unlinkSync(`./${tempFilename}`);
         resolve();
@@ -36,7 +32,7 @@ export function mergeToMKV(fileList = [], output = "./output.mkv") {
 
 export function mergeToTS(fileList = [], output = "./output.ts") {
     const cliProgress = require("cli-progress");
-    return new Promise(async (resolve) => {
+    return new Promise<void>(async (resolve) => {
         if (fileList.length === 0) {
             resolve();
         }
@@ -45,8 +41,7 @@ export function mergeToTS(fileList = [], output = "./output.ts") {
         const lastIndex = fileList.length - 1;
         const bar = new cliProgress.SingleBar(
             {
-                format:
-                    "[MINYAMI][MERGING] [{bar}] {percentage}% | ETA: {eta}s | {value}/{total}",
+                format: "[MINYAMI][MERGING] [{bar}] {percentage}% | ETA: {eta}s | {value}/{total}",
             },
             cliProgress.Presets.shades_classic
         );
@@ -57,17 +52,14 @@ export function mergeToTS(fileList = [], output = "./output.ts") {
         function write() {
             writable = true;
             while (i <= lastIndex && writable) {
-                writable = writeStream.write(
-                    fs.readFileSync(fileList[i]),
-                    () => {
-                        if (i > lastIndex) {
-                            bar.update(i);
-                            bar.stop();
-                            writeStream.end();
-                            resolve();
-                        }
+                writable = writeStream.write(fs.readFileSync(fileList[i]), () => {
+                    if (i > lastIndex) {
+                        bar.update(i);
+                        bar.stop();
+                        writeStream.end();
+                        resolve();
                     }
-                );
+                });
                 bar.update(i);
                 i++;
             }
@@ -85,29 +77,21 @@ export function mergeToTS(fileList = [], output = "./output.ts") {
  * @param url
  * @param path
  */
-export function download(
-    url: string,
-    path: string,
-    proxy: AxiosProxyConfig = undefined,
-    options: AxiosRequestConfig = {}
-) {
+export function download(url: string, path: string, options: AxiosRequestConfig = {}) {
     const CancelToken = axios.CancelToken;
     let source = CancelToken.source();
-    const promise = new Promise(async (resolve, reject) => {
+    const promise = new Promise<void>(async (resolve, reject) => {
         try {
             setTimeout(() => {
                 source && source.cancel();
                 source = null;
             }, options.timeout || 60000);
+            const proxyAgentInstance = ProxyAgentHelper.getProxyAgentInstance();
             const response = await axios({
                 url,
                 method: "GET",
                 responseType: "arraybuffer",
-                httpsAgent: proxy
-                    ? new SocksProxyAgent(
-                        `socks5h://${proxy.host}:${proxy.port}`
-                    )
-                    : undefined,
+                httpsAgent: proxyAgentInstance ? proxyAgentInstance : undefined,
                 headers: {
                     "User-Agent": UA.CHROME_DEFAULT_UA,
                     Host: new URL(url).host,
@@ -117,8 +101,7 @@ export function download(
             });
             if (
                 response.headers["content-length"] &&
-                parseInt(response.headers["content-length"]) !==
-                response.data.length
+                parseInt(response.headers["content-length"]) !== response.data.length
             ) {
                 reject(new Error("Bad Response"));
             }
@@ -138,19 +121,14 @@ export function download(
  * @param url
  * @param proxy
  */
-export async function requestRaw(
-    url: string,
-    proxy: AxiosProxyConfig = undefined,
-    options: AxiosRequestConfig = {}
-): Promise<AxiosResponse> {
+export async function requestRaw(url: string, options: AxiosRequestConfig = {}): Promise<AxiosResponse> {
+    const proxyAgentInstance = ProxyAgentHelper.getProxyAgentInstance();
     return await axios({
         url,
         method: "GET",
         responseType: "stream",
         timeout: 60000,
-        httpsAgent: proxy
-            ? new SocksProxyAgent(`socks5h://${proxy.host}:${proxy.port}`)
-            : undefined,
+        httpsAgent: proxyAgentInstance ? proxyAgentInstance : undefined,
         headers: {
             "User-Agent": UA.CHROME_DEFAULT_UA,
             Host: new URL(url).host,
@@ -162,33 +140,30 @@ export async function requestRaw(
  * 解密文件
  * @param input
  * @param output
- * @param key in hex 
+ * @param key in hex
  * @param iv in hex
  */
-export async function decrypt(
-    input: string,
-    output: string,
-    key: string,
-    iv: string
-) {
-    const algorithm = 'aes-128-cbc';
-    if (key.length !== 32) {
-        throw new Error(`Key [${key}] length [${key.length}] or form invalid.`);
-    }
-    if (iv.length > 32) {
-        throw new Error(`IV [${iv}] length [${iv.length}] or form invalid.`);
-    }
-    if (iv.length % 2 == 1) {
-        iv = '0' + iv;
-    }
-    const keyBuffer = Buffer.alloc(16);
-    const ivBuffer = Buffer.alloc(16);
-    keyBuffer.write(key, 'hex');
-    ivBuffer.write(iv, 16 - iv.length / 2, 'hex');
+export function decrypt(input: string, output: string, key: string, iv: string) {
+    return new Promise((resolve) => {
+        const algorithm = "aes-128-cbc";
+        if (key.length !== 32) {
+            throw new Error(`Key [${key}] length [${key.length}] or form invalid.`);
+        }
+        if (iv.length > 32) {
+            throw new Error(`IV [${iv}] length [${iv.length}] or form invalid.`);
+        }
+        if (iv.length % 2 == 1) {
+            iv = "0" + iv;
+        }
+        const keyBuffer = Buffer.alloc(16);
+        const ivBuffer = Buffer.alloc(16);
+        keyBuffer.write(key, "hex");
+        ivBuffer.write(iv, 16 - iv.length / 2, "hex");
 
-    const decipher = crypto.createDecipheriv(algorithm, keyBuffer, ivBuffer);
-    const i = fs.createReadStream(input);
-    const o = fs.createWriteStream(output);
-
-    await i.pipe(decipher).pipe(o);
+        const decipher = crypto.createDecipheriv(algorithm, keyBuffer, ivBuffer);
+        const i = fs.createReadStream(input);
+        const o = fs.createWriteStream(output);
+        const pipe = i.pipe(decipher).pipe(o);
+        pipe.on("finish", resolve);
+    });
 }

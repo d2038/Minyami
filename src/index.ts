@@ -1,25 +1,23 @@
 #!/usr/bin/env node
-import { ConsoleLogger } from "./utils/log";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import Erii from "erii";
 import ArchiveDownloader from "./core/archive";
 import LiveDownloader from "./core/live";
 import { exec, deleteDirectory } from "./utils/system";
-import * as fs from "fs";
+import logger from "./utils/log";
 import { timeStringToSeconds } from "./utils/time";
-const os = require("os");
-const path = require("path");
+import ProxyAgent from "./utils/agent";
 
 process.on("unhandledRejection", (error: Error) => {
     console.error(error.name, error.message, error.stack);
 });
 
-const Log = new ConsoleLogger();
-
 Erii.setMetaInfo({
     version:
-        JSON.parse(fs.readFileSync(path.resolve(__dirname, "../package.json")).toString())[
-            "version"
-        ] + "\nうめにゃん~ (虎>ω<)",
+        JSON.parse(fs.readFileSync(path.resolve(__dirname, "../package.json")).toString())["version"] +
+        "\nうめにゃん~ (虎>ω<)",
     name: "Minyami / A lovely video downloader",
 });
 
@@ -58,13 +56,20 @@ Erii.bind(
     },
     async (ctx, options) => {
         const path = ctx.getArgument().toString();
+        if (options.verbose) {
+            logger.enableDebugMode();
+        }
+        ProxyAgent.readProxyConfigurationFromEnv();
         if (options.live) {
             const downloader = new LiveDownloader(path, {
                 ...options,
                 cliMode: true,
-                logger: new ConsoleLogger(),
+                logger,
             });
             downloader.on("finished", () => {
+                process.exit();
+            });
+            downloader.on("critical-error", () => {
                 process.exit();
             });
             await downloader.download();
@@ -72,9 +77,12 @@ Erii.bind(
             const downloader = new ArchiveDownloader(path, {
                 ...options,
                 cliMode: true,
-                logger: new ConsoleLogger(),
+                logger,
             });
             downloader.on("finished", () => {
+                process.exit();
+            });
+            downloader.on("critical-error", () => {
                 process.exit();
             });
             await downloader.init();
@@ -98,6 +106,9 @@ Erii.bind(
             cliMode: true,
         });
         downloader.on("finished", () => {
+            process.exit();
+        });
+        downloader.on("critical-error", () => {
             process.exit();
         });
         downloader.resume(path);
@@ -153,9 +164,9 @@ Erii.addOption({
     argument: {
         name: "path",
         description: "(Optional) Output file path, defaults to ./output.mkv",
-        validate: (outputPath: string, logger) => {
+        validate: (outputPath: string, validateLogger) => {
             if (!outputPath.endsWith(".mkv") && !outputPath.endsWith(".ts")) {
-                logger("Output filename must ends with .mkv or .ts.");
+                validateLogger("Output filename must ends with .mkv or .ts.");
                 return false;
             }
             if (outputPath.endsWith("mkv")) {
@@ -164,11 +175,11 @@ Erii.addOption({
                         //
                     })
                     .catch((e) => {
-                        Log.error("Missing dependence: mkvmerge");
+                        logger.error("Missing dependence: mkvmerge");
                     });
             }
             if (path.basename(outputPath).match(/[\*\:|\?<>]/)) {
-                logger("Filename should't contain :, |, <, >.");
+                validateLogger("Filename should't contain :, |, <, >.");
                 return false;
             }
             return true;
@@ -229,10 +240,10 @@ Erii.addOption({
 Erii.addOption({
     name: ["proxy"],
     command: "download",
-    description: "Download via Socks proxy (Deprecated)",
+    description: "Use the specified HTTP/HTTPS/SOCKS proxy",
     argument: {
-        name: "socks-proxy",
-        description: 'Set Socks Proxy in [<host>:<port>] format. eg. --proxy "127.0.0.1:1080".',
+        name: "proxy-server",
+        description: 'Set proxy in [protocol://<host>:<port>] format. eg. --proxy "http://127.0.0.1:1080".',
     },
 });
 
@@ -263,7 +274,7 @@ Erii.addOption({
 });
 
 Erii.addOption({
-    name: ["nomerge"],
+    name: ["nomerge", "keep"],
     command: "download",
     description: "Do not merge m3u8 chunks.",
 });

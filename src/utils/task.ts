@@ -1,6 +1,6 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { ChunkItem } from '../core/downloader';
+import * as fs from "fs";
+import * as path from "path";
+import { ChunkItem } from "../core/downloader";
 
 export interface MinyamiTask {
     id: string; // 唯一标识符
@@ -26,8 +26,6 @@ export interface MinyamiTask {
     timeout: number; // 超时时间
 
     proxy: string;
-    proxyHost: string;
-    proxyPort: number;
 
     allChunks: ChunkItem[]; // 全部块
     chunks: ChunkItem[]; // 未下载的块
@@ -37,10 +35,10 @@ export interface MinyamiTask {
 
 /**
  * Get previous task
- * @param taskId 
+ * @param taskId
  */
 export function getTask(taskId: string): MinyamiTask {
-    const taskFilePath = path.resolve(__dirname, '../../tasks.json');
+    const taskFilePath = path.resolve(__dirname, "../../tasks.json");
     if (!fs.existsSync(taskFilePath)) {
         return;
     }
@@ -48,7 +46,7 @@ export function getTask(taskId: string): MinyamiTask {
     const taskFileContent = fs.readFileSync(taskFilePath).toString();
     try {
         const previousTasks = JSON.parse(taskFileContent);
-        const index = previousTasks.findIndex(t => {
+        const index = previousTasks.findIndex((t) => {
             return t.id === taskId;
         });
         if (index === -1) {
@@ -62,10 +60,10 @@ export function getTask(taskId: string): MinyamiTask {
 
 /**
  * Save(add) or update task
- * @param task 
+ * @param task
  */
 export function saveTask(task: MinyamiTask) {
-    const taskFilePath = path.resolve(__dirname, '../../tasks.json');
+    const taskFilePath = path.resolve(__dirname, "../../tasks.json");
     const tasks = [];
     if (fs.existsSync(taskFilePath)) {
         const taskFileContent = fs.readFileSync(taskFilePath).toString();
@@ -73,12 +71,12 @@ export function saveTask(task: MinyamiTask) {
             const previousTasks = JSON.parse(taskFileContent);
             tasks.push(...previousTasks);
         } catch (e) {
-            throw new Error('Fail to parse previous tasks, ignored. ' + e);
+            throw new Error("Fail to parse previous tasks, ignored. " + e);
         }
     }
 
-    const index = tasks.findIndex(t => t.id === task.id);
-    
+    const index = tasks.findIndex((t) => t.id === task.id);
+
     if (index !== -1) {
         // Update previous task
         tasks[index] = task;
@@ -92,10 +90,10 @@ export function saveTask(task: MinyamiTask) {
 
 /**
  * Delete task
- * @param taskId 
+ * @param taskId
  */
 export function deleteTask(taskId: string): boolean {
-    const taskFilePath = path.resolve(__dirname, '../../tasks.json');
+    const taskFilePath = path.resolve(__dirname, "../../tasks.json");
     const tasks = [];
 
     if (!fs.existsSync(taskFilePath)) {
@@ -108,19 +106,22 @@ export function deleteTask(taskId: string): boolean {
         const previousTasks = JSON.parse(taskFileContent);
         tasks.push(...previousTasks);
     } catch (e) {
-        throw new Error('Fail to parse previous tasks, ignored. ' + e);
+        throw new Error("Fail to parse previous tasks, ignored. " + e);
     }
 
-    const index = tasks.findIndex(t => t.id === taskId);
-    
+    const index = tasks.findIndex((t) => t.id === taskId);
+
     if (index === -1) {
         return false;
     } else {
         // Write back to file
-        fs.writeFileSync(taskFilePath, JSON.stringify(
-            tasks.filter(t => t.id !== taskId),
-            null,
-            2
-        ));
+        fs.writeFileSync(
+            taskFilePath,
+            JSON.stringify(
+                tasks.filter((t) => t.id !== taskId),
+                null,
+                2
+            )
+        );
     }
 }

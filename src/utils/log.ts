@@ -1,17 +1,12 @@
-import chalk from 'chalk';
-abstract class Logger {
-    public abstract debug(message: string);
-    public abstract info(message: string);
-    public abstract warning(message: string);
-    public abstract error(message: string, error?: any);
-}
+import chalk from "chalk";
 
-export class ConsoleLogger extends Logger {
+class ConsoleLogger {
+    private isDebugMode = false;
     debug(message: string) {
-        console.debug(chalk.gray(`[MINYAMI][DEBUG] ${message}`));
+        this.isDebugMode && console.debug(chalk.gray(`[MINYAMI][DEBUG] ${message}`));
     }
 
-    info(message: string, infoObj: any = undefined) {
+    info(message: string) {
         console.info(chalk.white(`[MINYAMI][INFO] ${message}`));
     }
 
@@ -19,11 +14,14 @@ export class ConsoleLogger extends Logger {
         console.warn(chalk.yellow(`[MINYAMI][WARN] ${message}`));
     }
 
-    error(message: string, error: any = undefined) {
+    error(message: string, error?: Error) {
         if (error !== undefined) console.log(error);
         console.info(chalk.red(`[MINYAMI][ERROR] ${message}`));
-        process.exit();
+    }
+
+    enableDebugMode() {
+        this.isDebugMode = true;
     }
 }
 
-export default Logger;
+export default new ConsoleLogger();
